@@ -70,9 +70,19 @@ public class MapperScannerRegistrar implements ImportBeanDefinitionRegistrar, Re
    */
   @Override
   public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry) {
+    // 获取 @MapperScan 的参数
+    // 主要是以下几个
+    //
+    // - basePackages
+    // - sqlSessionTemplateRef > sqlSessionTemplate 的 beanName
+    // - sqlSessionFactoryRef  > sqlSessionFactory  的 beanName
+
     AnnotationAttributes mapperScanAttrs = AnnotationAttributes
         .fromMap(importingClassMetadata.getAnnotationAttributes(MapperScan.class.getName()));
     if (mapperScanAttrs != null) {
+
+      // 注册 MapperScannerConfigurer
+      // 用于真正的扫描mapper 接口，并做sql方法注入
       registerBeanDefinitions(importingClassMetadata, mapperScanAttrs, registry,
           generateBaseBeanName(importingClassMetadata, 0));
     }
@@ -82,6 +92,10 @@ public class MapperScannerRegistrar implements ImportBeanDefinitionRegistrar, Re
       BeanDefinitionRegistry registry, String beanName) {
 
     BeanDefinitionBuilder builder = BeanDefinitionBuilder.genericBeanDefinition(MapperScannerConfigurer.class);
+
+    // 这里的propertyValue是在根据 BeanDefinition 生成Bean实例时，需要注入的参数列表
+    // @see MutablePropertyValues
+    //
     builder.addPropertyValue("processPropertyPlaceHolders", true);
 
     Class<? extends Annotation> annotationClass = annoAttrs.getClass("annotationClass");
@@ -103,6 +117,18 @@ public class MapperScannerRegistrar implements ImportBeanDefinitionRegistrar, Re
     if (!MapperFactoryBean.class.equals(mapperFactoryBeanClass)) {
       builder.addPropertyValue("mapperFactoryBeanClass", mapperFactoryBeanClass);
     }
+
+    // 在多个数据源的情况下，需要注明具体的sqlSessionTemplate beanName
+    // mybatis 的mapper 是通过MapperFactoryBean注入到容器中的
+    //
+    // MapperFactoryBean 继承了SqlSessionDaoSupport
+    // SqlSessionDaoSupport中需要注入SqlSessionTemplate
+    // 这一点会在MapperScannerConfigurer中看到
+    //
+    // 否则在生成mapper bean 时
+    // 会根据类型 SqlSessionTemplate 去找bean实例
+    // 有可能会找到多个，会抛出异常 NoUniqueBeanDefinitionException
+    // org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency
 
     String sqlSessionTemplateRef = annoAttrs.getString("sqlSessionTemplateRef");
     if (StringUtils.hasText(sqlSessionTemplateRef)) {
