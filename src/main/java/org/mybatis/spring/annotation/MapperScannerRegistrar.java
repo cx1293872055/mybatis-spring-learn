@@ -25,6 +25,7 @@ import org.mybatis.spring.mapper.ClassPathMapperScanner;
 import org.mybatis.spring.mapper.MapperFactoryBean;
 import org.mybatis.spring.mapper.MapperScannerConfigurer;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.MutablePropertyValues;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
@@ -94,8 +95,9 @@ public class MapperScannerRegistrar implements ImportBeanDefinitionRegistrar, Re
     BeanDefinitionBuilder builder = BeanDefinitionBuilder.genericBeanDefinition(MapperScannerConfigurer.class);
 
     // 这里的propertyValue是在根据 BeanDefinition 生成Bean实例时，需要注入的参数列表
-    // @see MutablePropertyValues
-    //
+    /**
+     * @see MutablePropertyValues
+     */
     builder.addPropertyValue("processPropertyPlaceHolders", true);
 
     Class<? extends Annotation> annotationClass = annoAttrs.getClass("annotationClass");
@@ -128,7 +130,9 @@ public class MapperScannerRegistrar implements ImportBeanDefinitionRegistrar, Re
     // 否则在生成mapper bean 时
     // 会根据类型 SqlSessionTemplate 去找bean实例
     // 有可能会找到多个，会抛出异常 NoUniqueBeanDefinitionException
-    // org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency
+    /**
+     * @see org.springframework.beans.factory.support.DefaultListableBeanFactory#doResolveDependency
+     */
 
     String sqlSessionTemplateRef = annoAttrs.getString("sqlSessionTemplateRef");
     if (StringUtils.hasText(sqlSessionTemplateRef)) {
@@ -167,6 +171,16 @@ public class MapperScannerRegistrar implements ImportBeanDefinitionRegistrar, Re
     // for spring-native
     builder.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
 
+    // 调用注册器,注册beanDefinition
+    // 这里的BeanDefinition 类型为MapperScannerConfigurer
+    // 如果有多个@MappScan
+    // 那么会注册多个 MapperScannerConfigurer
+    // 每个MapperScannerConfigurer 的sqlSessionFactory 是独立的
+    //
+    // 然后看MapperScannerConfigurer
+    /**
+      @see MapperScannerConfigurer#postProcessBeanDefinitionRegistry
+     */
     registry.registerBeanDefinition(beanName, builder.getBeanDefinition());
 
   }
@@ -193,10 +207,12 @@ public class MapperScannerRegistrar implements ImportBeanDefinitionRegistrar, Re
       AnnotationAttributes mapperScansAttrs = AnnotationAttributes
           .fromMap(importingClassMetadata.getAnnotationAttributes(MapperScans.class.getName()));
       if (mapperScansAttrs != null) {
+
+        // 和单个注解处理逻辑相同
         AnnotationAttributes[] annotations = mapperScansAttrs.getAnnotationArray("value");
         for (int i = 0; i < annotations.length; i++) {
           registerBeanDefinitions(importingClassMetadata, annotations[i], registry,
-              generateBaseBeanName(importingClassMetadata, i));
+                                  generateBaseBeanName(importingClassMetadata, i));
         }
       }
     }

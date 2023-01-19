@@ -226,15 +226,28 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
    */
   @Override
   public Set<BeanDefinitionHolder> doScan(String... basePackages) {
+    // 调用父类方法
+    // 会根据添加的TypeFilter 对自定义的注解和接口 进行扫描
+    // 并生成BeanDefinitionHolder
     Set<BeanDefinitionHolder> beanDefinitions = super.doScan(basePackages);
 
     if (beanDefinitions.isEmpty()) {
+      // 如果没有扫描到，打印WARN日志
       if (printWarnLogIfNotFoundMappers) {
         LOGGER.warn(() -> "No MyBatis mapper was found in '" + Arrays.toString(basePackages)
             + "' package. Please check your configuration.");
       }
     } else {
+
+      // 通过BeanDefinitionHolder 对BeanDefinition 进行自定义处理
+      // 主要是 设置BeanClass 类型为MapperFactoryBean
+      // 并设置对应mapper 接口类型。
       processBeanDefinitions(beanDefinitions);
+      // 处理完成后，现在的Bean 就是MapperFactoryBean 了
+      // 下面看getObject方法
+      /**
+       * @see MapperFactoryBean#getObject()
+       */
     }
 
     return beanDefinitions;
@@ -259,6 +272,8 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
 
       // the mapper interface is the original class of the bean
       // but, the actual class of the bean is MapperFactoryBean
+
+      // 这里是设置MapperFactoryBean 构造方法的参数类型 为当前Mapper接口类型
       definition.getConstructorArgumentValues().addGenericArgumentValue(beanClassName); // issue #59
       try {
         // for spring-native
@@ -267,6 +282,7 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
         // ignore
       }
 
+      // 设置Bean 的类型为MapperFactoryBean
       definition.setBeanClass(this.mapperFactoryBeanClass);
 
       definition.getPropertyValues().add("addToConfig", this.addToConfig);
@@ -275,8 +291,14 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
       // https://github.com/mybatis/spring-boot-starter/issues/475
       definition.setAttribute(FACTORY_BEAN_OBJECT_TYPE, beanClassName);
 
+      // 标识 sqlSessionFactory 是否使用
       boolean explicitFactoryUsed = false;
       if (StringUtils.hasText(this.sqlSessionFactoryBeanName)) {
+
+
+        // 如果@MapperScan 注解设置了sqlSessionFactoryRef 参数，
+        // 那么会加入一个Bean的引用，就是一个Bean的名称
+        // 实例化时 会根据名称找到Bean
         definition.getPropertyValues().add("sqlSessionFactory",
             new RuntimeBeanReference(this.sqlSessionFactoryBeanName));
         explicitFactoryUsed = true;
@@ -302,6 +324,9 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
         explicitFactoryUsed = true;
       }
 
+      // 如果@MapperScan 注解没有设置 sqlSessionTemplate 或者 sqlSessionFactory
+      // 那么设置通过类型注入属性
+      // 实例化的时候如果此类型有多个Bean 那么会启动失败。
       if (!explicitFactoryUsed) {
         LOGGER.debug(() -> "Enabling autowire by type for MapperFactoryBean with name '" + holder.getBeanName() + "'.");
         definition.setAutowireMode(AbstractBeanDefinition.AUTOWIRE_BY_TYPE);
@@ -317,6 +342,7 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
         definition.setScope(defaultScope);
       }
 
+      // 如果是这个Mapper 不是单例的 那么为这个Mapper 生成范围代理Bean，并注册
       if (!definition.isSingleton()) {
         BeanDefinitionHolder proxyHolder = ScopedProxyUtils.createScopedProxy(holder, registry, true);
         if (registry.containsBeanDefinition(proxyHolder.getBeanName())) {

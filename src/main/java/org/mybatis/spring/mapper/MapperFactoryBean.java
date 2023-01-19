@@ -92,6 +92,18 @@ public class MapperFactoryBean<T> extends SqlSessionDaoSupport implements Factor
    */
   @Override
   public T getObject() throws Exception {
+    // MapperFactoryBean 继承SqlSessionDaoSupport
+    // 在
+    /**
+     * @see org.mybatis.spring.mapper.ClassPathMapperScanner#processBeanDefinitions
+     */
+    // 中对sqlSessionFactory或者sqlSessionTemplate 进行BeanDefinition的参数定义
+
+
+    // 然后看SqlSession 是怎么处理mapper 的。
+    /**
+     * @see com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean#buildSqlSessionFactory()
+     */
     return getSqlSession().getMapper(this.mapperInterface);
   }
 

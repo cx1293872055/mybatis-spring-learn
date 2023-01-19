@@ -23,6 +23,7 @@ import java.util.Optional;
 
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionTemplate;
+import org.mybatis.spring.annotation.MapperScannerRegistrar;
 import org.springframework.beans.PropertyValue;
 import org.springframework.beans.PropertyValues;
 import org.springframework.beans.factory.BeanNameAware;
@@ -38,7 +39,10 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.ClassPathBeanDefinitionScanner;
+import org.springframework.core.annotation.AnnotationAttributes;
 import org.springframework.core.env.Environment;
+import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.util.StringUtils;
 
 /**
@@ -356,11 +360,30 @@ public class MapperScannerConfigurer
    */
   @Override
   public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) {
+    /**
+     * 继承自
+     * @see BeanDefinitionRegistryPostProcessor
+     *
+     * 能够在Bean注册阶段定义并注册更多的Bean
+     * 也就是在这里，真正的注册mapper
+     */
+
+    // processPropertyPlaceHolders 参数是在MapperScannerRegistrar 放入的。
+    // 意思是 是否处理参数中的占位符
+    // 例如 ${}
+    /**
+     * @see MapperScannerRegistrar#registerBeanDefinitions(AnnotationMetadata, AnnotationAttributes, BeanDefinitionRegistry, String)
+     */
     if (this.processPropertyPlaceHolders) {
       processPropertyPlaceHolders();
     }
 
     ClassPathMapperScanner scanner = new ClassPathMapperScanner(registry);
+    // 这里所有的参数都是MapperScannerRegistrar 在构建MapperScannerConfigurer 的BeanDefinition 时放入的定义。
+    // 实例化时会根据PropertyValue 中的name 和value set对应的属性
+    /**
+     * @see MapperScannerRegistrar#registerBeanDefinitions(AnnotationMetadata, AnnotationAttributes, BeanDefinitionRegistry, String)
+     */
     scanner.setAddToConfig(this.addToConfig);
     scanner.setAnnotationClass(this.annotationClass);
     scanner.setMarkerInterface(this.markerInterface);
@@ -377,7 +400,18 @@ public class MapperScannerConfigurer
     if (StringUtils.hasText(defaultScope)) {
       scanner.setDefaultScope(defaultScope);
     }
+
+    // 向扫描器中添加 过滤器。
+    // 增加扩展能力，能够扫描自定义注解和自定义接口类。
     scanner.registerFilters();
+
+    // 根据@MapperScan 注解的basePackage 参数 开始扫描 mapper 并注册BeanDefinition
+    // ClassPathMapperScanner 继承 ClassPathBeanDefinitionScanner
+    // scan 使用父类方法
+    // 重写了doScan 方法
+    /**
+     * @see ClassPathBeanDefinitionScanner#doScan(String...)
+     */
     scanner.scan(
         StringUtils.tokenizeToStringArray(this.basePackage, ConfigurableApplicationContext.CONFIG_LOCATION_DELIMITERS));
   }
